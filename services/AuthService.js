@@ -22,7 +22,7 @@ class AuthService {
         return { canAccess: false, reason: 'Mot de passe requis pour cette salle' };
       }
 
-      // Vérifier le mot de passe
+      // Vérifier le mot de passe avec bcrypt
       if (room.password_hash) {
         const bcrypt = require('bcrypt');
         const isValid = await bcrypt.compare(password, room.password_hash);
@@ -31,17 +31,8 @@ class AuthService {
           return { canAccess: false, reason: 'Mot de passe incorrect' };
         }
       } else {
-        // Si pas de hash défini, utiliser les mots de passe par défaut
-        const defaultPasswords = {
-          2: 'xK9mP2qR',     // Cousins
-          3: 'vN7hL4tY',     // Lardo
-          4: 'wQ8jM5uZ',     // Les Gogols
-          5: 'aB3cD6eF'      // Keur
-        };
-        
-        if (defaultPasswords[room.id] !== password) {
-          return { canAccess: false, reason: 'Mot de passe incorrect' };
-        }
+        // Si la salle est marquée comme protégée mais n'a pas de hash, c'est une erreur
+        return { canAccess: false, reason: 'Erreur de configuration de la salle' };
       }
 
       return { canAccess: true, room, reason: 'Mot de passe correct' };

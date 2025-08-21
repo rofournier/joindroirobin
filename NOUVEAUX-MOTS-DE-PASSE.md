@@ -1,69 +1,56 @@
-# 🔐 **Nouveaux mots de passe JoindreRobin**
+# 🔐 Mots de passe des salles protégées
 
-## 📋 **Récapitulatif des accès (Base réinitialisée)**
+## 📋 Liste des salles et leurs mots de passe
 
-### **🏠 Salle Général**
-- **Statut** : Publique (accès libre)
-- **Mot de passe** : Aucun requis
-- **Catégorie** : Général
-- **Description** : Discussion générale et accueil
-- **ID** : 9
+### 🟢 Salle publique (pas de mot de passe)
+- **Général** - Discussion générale et accueil - Accès libre
 
-### **👨‍👩‍👧‍👦 Salle Cousins**
-- **Statut** : Protégée
-- **Mot de passe** : `xK9mP2qR`
-- **Catégorie** : Famille
-- **Description** : Salle des cousins - Discussions familiales
-- **ID** : 10
+### 🔒 Salles protégées (mot de passe requis)
 
-### **🔒 Salle Lardo**
-- **Statut** : Protégée
-- **Mot de passe** : `vN7hL4tY`
-- **Catégorie** : Privée
-- **Description** : Salle Lardo - Discussions privées
-- **ID** : 11
+#### 👨‍👩‍👧‍👦 **Cousins** - Salle des cousins
+- **Mot de passe :** `xK9mP2qR`
+- **Catégorie :** Famille
+- **Capacité :** 30 utilisateurs
 
-### **😄 Salle Les Gogols**
-- **Statut** : Protégée
-- **Mot de passe** : `wQ8jM5uZ`
-- **Catégorie** : Fun
-- **Description** : Salle des gogols - Humour et détente
-- **ID** : 12
+#### 🏠 **Lardo** - Salle Lardo  
+- **Mot de passe :** `vN7hL4tY`
+- **Catégorie :** Privée
+- **Capacité :** 20 utilisateurs
 
-### **✨ Salle Keur** (NOUVELLE)
-- **Statut** : Protégée
-- **Mot de passe** : `aB3cD6eF`
-- **Catégorie** : Spéciale
-- **Description** : Salle Keur - Discussions spéciales
-- **ID** : 13
+#### 😄 **Les Gogols** - Salle des gogols
+- **Mot de passe :** `wQ8jM5uZ`
+- **Catégorie :** Fun
+- **Capacité :** 40 utilisateurs
 
-## 🚀 **Comment utiliser**
+#### ⭐ **Keur** - Salle Keur - Discussions spéciales
+- **Mot de passe :** `aB3cD6eF`
+- **Catégorie :** Spéciale
+- **Capacité :** 25 utilisateurs
 
-1. **Salle Général** : Cliquer directement pour accéder
-2. **Salles protégées** : Cliquer puis entrer le mot de passe correspondant
-3. **Tous les mots de passe** sont hashés avec bcrypt pour la sécurité
+#### 🐧 **Les pingouins** - Bqanquise
+- **Mot de passe :** `aB3cGT5`
+- **Catégorie :** Fun
+- **Capacité :** 25 utilisateurs
 
-## 🔒 **Sécurité**
+---
 
-- **Mots de passe aléatoires** : Générés automatiquement
-- **Hashage bcrypt** : Stockage sécurisé dans la base de données
-- **Validation côté serveur** : Vérification avant accès au chat
+## ⚠️ Problème résolu
 
-## 📝 **Notes importantes**
+Le problème de connexion aux salles a été corrigé. L'erreur "Mot de passe requis pour cette salle" était due à une logique incorrecte dans le service d'authentification.
 
-- **Base réinitialisée** : Toutes les anciennes données ont été supprimées
-- **Nouveaux IDs** : Les salles ont de nouveaux identifiants (9-13)
-- **Admin créé** : Utilisateur "Admin" créé automatiquement
-- **Messages système** : Messages de bienvenue dans chaque salle
+**Solution appliquée :**
+- Suppression de la logique de fallback incorrecte
+- Utilisation exclusive de la vérification bcrypt des mots de passe hashés
+- Toutes les salles protégées ont maintenant leurs mots de passe correctement configurés
 
-## 🎯 **Test recommandé**
+## 🔧 Comment utiliser
 
-1. **Ouvrir** `http://localhost:3000`
-2. **Définir un pseudo** (ex: "TestUser")
-3. **Tester la salle Général** (accès libre)
-4. **Tester les salles protégées** avec leurs mots de passe
-5. **Vérifier** que toutes les fonctionnalités marchent
+1. Choisissez la salle que vous souhaitez rejoindre
+2. Si la salle est protégée, entrez le mot de passe correspondant
+3. Cliquez sur "Rejoindre la salle"
 
-## 🎉 **Résultat**
+## 📝 Notes techniques
 
-5 salles créées avec succès, dont la nouvelle salle "Keur" ! 🚀✨
+- Les mots de passe sont stockés de manière sécurisée avec bcrypt
+- La salle "Général" est publique et ne nécessite pas de mot de passe
+- Toutes les autres salles sont protégées et nécessitent le mot de passe approprié

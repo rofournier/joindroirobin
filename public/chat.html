@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoindreRobin - Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 h-screen flex flex-col">
+    
+    <!-- Header moderne -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div class="flex items-center justify-between px-4 py-3">
+            <!-- Bouton retour et info de la salle -->
+            <div class="flex items-center space-x-3">
+                <button id="backBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                </button>
+                <div>
+                    <h1 id="roomName" class="text-lg font-semibold text-gray-900 dark:text-white">Nom de la salle</h1>
+                    <p id="roomDescription" class="text-sm text-gray-500 dark:text-gray-400">Description de la salle</p>
+                </div>
+            </div>
+            
+            <!-- Menu de la salle -->
+            <div class="flex items-center space-x-2">
+                <button id="roomMenuBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Menu de la salle (dropdown) -->
+    <div id="roomMenu" class="hidden absolute top-16 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 min-w-48">
+        <div class="py-2">
+            <button id="showUsersBtn" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                </svg>
+                <span>Voir les utilisateurs</span>
+            </button>
+            <button id="roomInfoBtn" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Infos de la salle</span>
+            </button>
+            <hr class="my-2 border-gray-200 dark:border-gray-700">
+            <button id="leaveRoomBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                <span>Quitter la salle</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenu principal -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Zone des messages -->
+        <div class="flex-1 flex flex-col">
+            
+            <!-- Zone de messages avec scroll -->
+            <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+                <!-- Les messages seront injectés ici -->
+            </div>
+            
+            <!-- Indicateur de frappe -->
+            <div id="typingIndicator" class="hidden px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                <p class="text-sm text-gray-500 dark:text-gray-400 italic">
+                    <span id="typingUsers"></span> est en train d'écrire...
+                </p>
+            </div>
+            
+            <!-- Zone de saisie moderne -->
+            <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+                <div class="flex items-end space-x-3">
+                    <!-- Zone de texte avec auto-resize -->
+                    <div class="flex-1 relative">
+                        <textarea 
+                            id="messageInput" 
+                            class="w-full resize-none border border-gray-300 dark:border-gray-600 rounded-2xl px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Tapez votre message..."
+                            rows="1"
+                            maxlength="1000"
+                        ></textarea>
+                        
+                        <!-- Compteur de caractères -->
+                        <div class="absolute bottom-2 right-3 text-xs text-gray-400 dark:text-gray-500">
+                            <span id="charCount">0</span>/1000
+                        </div>
+                    </div>
+                    
+                    <!-- Bouton d'envoi -->
+                    <button 
+                        id="sendBtn" 
+                        class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-full p-3 transition-colors duration-200 flex-shrink-0"
+                        disabled
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar des utilisateurs (masquée sur mobile) -->
+        <div id="usersSidebar" class="hidden lg:block w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Utilisateurs en ligne</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    <span id="userCount">0</span> utilisateur(s)
+                </p>
+            </div>
+            
+            <div id="usersList" class="p-4 space-y-3">
+                <!-- Les utilisateurs seront injectés ici -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal des utilisateurs (mobile) -->
+    <div id="usersModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
+        <div class="fixed inset-y-0 right-0 w-80 bg-white dark:bg-gray-800 shadow-xl">
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Utilisateurs</h3>
+                <button id="closeUsersModal" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="mobileUsersList" class="p-4 space-y-3">
+                <!-- Les utilisateurs seront injectés ici -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'infos de la salle -->
+    <div id="roomInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Informations de la salle</h3>
+                    <button id="closeRoomInfoModal" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nom</label>
+                        <p id="modalRoomName" class="text-gray-900 dark:text-white font-medium"></p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                        <p id="modalRoomDescription" class="text-gray-600 dark:text-gray-400"></p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Catégorie</label>
+                        <p id="modalRoomCategory" class="text-gray-600 dark:text-gray-400"></p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Utilisateurs</label>
+                        <p id="modalRoomUsers" class="text-gray-600 dark:text-gray-400"></p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Créée par</label>
+                        <p id="modalRoomCreator" class="text-gray-600 dark:text-gray-400"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications toast -->
+    <div id="notifications" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script src="/js/chat.js"></script>
+</body>
+</html>

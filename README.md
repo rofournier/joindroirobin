@@ -13,6 +13,8 @@ Une application de chat moderne et élégante conçue spécialement pour Joindre
 - **Chat en temps réel** avec Socket.IO et communication instantanée
 - **Gestion des utilisateurs** en ligne avec rôles et permissions
 - **Design moderne** avec Tailwind CSS et animations CSS
+- **📸 Upload d'images** avec prévisualisation et stockage sécurisé
+- **🎥 Support YouTube** automatique avec iframe intégré
 
 ## 🛠️ Technologies utilisées
 

@@ -18,6 +18,7 @@ class ModernChatApp {
         this.messages = [];
         this.typingUsers = new Set();
         this.typingTimeout = null;
+        this.currentImage = null; // Image en cours d'upload
         
         this.init();
     }
@@ -298,8 +299,9 @@ class ModernChatApp {
         container.insertAdjacentHTML('beforeend', this.createMessageElement(message));
     }
     
+    // Créer un élément de message avec support des images et YouTube
     createMessageElement(message) {
-        // Gérer les messages système (qui n'ont pas de structure user)
+        // Gérer les messages système
         if (message.message_type === 'system') {
             return `
                 <div class="flex justify-center">
@@ -310,9 +312,26 @@ class ModernChatApp {
             `;
         }
         
-        // Extraire le nom d'utilisateur selon la structure du message
+        // Extraire le nom d'utilisateur
         const username = message.user ? message.user.username : message.username;
         const isOwnMessage = username === this.username;
+        
+        // Traiter le contenu pour YouTube
+        let processedContent = message.content;
+        if (message.message_type === 'text' && message.youtubeInfo) {
+            // Le contenu a déjà été traité côté serveur
+            processedContent = message.content;
+        }
+        
+        // Traiter les images
+        let imageHtml = '';
+        if (message.message_type === 'image') {
+            imageHtml = `
+                <div class="mt-2">
+                    <img src="${message.content}" alt="Image" class="chat-image" onclick="this.parentElement.parentElement.parentElement.parentElement.querySelector('.image-modal')?.remove(); this.parentElement.parentElement.parentElement.parentElement.insertAdjacentHTML('beforeend', '<div class=\\'image-modal\\' onclick=\\'this.remove()\\'><img src=\\'${message.content}\\' alt=\\'Image agrandie\\'></div>')">
+                </div>
+            `;
+        }
         
         return `
             <div class="flex ${isOwnMessage ? 'justify-end' : 'justify-start'}">
@@ -326,7 +345,8 @@ class ModernChatApp {
                         </div>
                     ` : ''}
                     <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-sm">
-                        <p class="text-gray-900 dark:text-white text-sm">${message.content}</p>
+                        <p class="text-gray-900 dark:text-white text-sm">${processedContent}</p>
+                        ${imageHtml}
                     </div>
                     <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 ${isOwnMessage ? 'text-right' : 'text-left'}">
                         ${this.formatMessageTime(message.created_at)}
@@ -430,7 +450,7 @@ class ModernChatApp {
             charCount.textContent = textarea.value.length;
             
             // Activer/désactiver le bouton d'envoi
-            sendBtn.disabled = textarea.value.trim().length === 0;
+            sendBtn.disabled = textarea.value.trim().length === 0 && !this.currentImage;
             
             // Gérer la frappe
             this.handleTyping();
@@ -493,6 +513,21 @@ class ModernChatApp {
             this.sendMessage();
         });
         
+        // Bouton d'upload d'image
+        document.getElementById('uploadImageBtn').addEventListener('click', () => {
+            document.getElementById('imageInput').click();
+        });
+        
+        // Input file pour l'image
+        document.getElementById('imageInput').addEventListener('change', (e) => {
+            this.handleImageSelect(e.target.files[0]);
+        });
+        
+        // Bouton de suppression d'image
+        document.getElementById('removeImageBtn').addEventListener('click', () => {
+            this.removeCurrentImage();
+        });
+        
         // Configuration de l'auto-resize
         this.setupAutoResize();
     }
@@ -542,20 +577,27 @@ class ModernChatApp {
         const textarea = document.getElementById('messageInput');
         const message = textarea.value.trim();
         
-        if (!message || !this.socket || !this.currentRoom) return;
+        if (!message && !this.currentImage) return;
+        if (!this.socket || !this.currentRoom) return;
         
-        this.socket.emit('send_message', {
-            username: this.username,
-            roomId: this.currentRoom.id,
-            content: message,
-            messageType: 'text'
-        });
-        
-        // Réinitialiser le textarea
-        textarea.value = '';
-        textarea.style.height = 'auto';
-        document.getElementById('charCount').textContent = '0';
-        document.getElementById('sendBtn').disabled = true;
+        if (this.currentImage) {
+            // Envoyer l'image
+            this.uploadImage();
+        } else {
+            // Envoyer le message texte
+            this.socket.emit('send_message', {
+                username: this.username,
+                roomId: this.currentRoom.id,
+                content: message,
+                messageType: 'text'
+            });
+            
+            // Réinitialiser le textarea
+            textarea.value = '';
+            textarea.style.height = 'auto';
+            document.getElementById('charCount').textContent = '0';
+            document.getElementById('sendBtn').disabled = true;
+        }
         
         // Arrêter l'indicateur de frappe
         this.handleStopTyping();
@@ -597,6 +639,82 @@ class ModernChatApp {
         }
         
         window.location.href = '/';
+    }
+    
+    // Gérer la sélection d'une image
+    handleImageSelect(file) {
+        if (!file) return;
+        
+        // Vérifier le type de fichier
+        if (!file.type.startsWith('image/')) {
+            this.showError('Veuillez sélectionner une image valide');
+            return;
+        }
+        
+        // Vérifier la taille (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+            this.showError('L\'image est trop volumineuse (max 10MB)');
+            return;
+        }
+        
+        // Créer la prévisualisation
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.currentImage = file;
+            document.getElementById('previewImg').src = e.target.result;
+            document.getElementById('imagePreview').classList.remove('hidden');
+            
+            // Activer le bouton d'envoi
+            document.getElementById('sendBtn').disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    // Supprimer l'image actuelle
+    removeCurrentImage() {
+        this.currentImage = null;
+        document.getElementById('imagePreview').classList.add('hidden');
+        document.getElementById('imageInput').value = '';
+        
+        // Désactiver le bouton d'envoi si pas de texte
+        const textarea = document.getElementById('messageInput');
+        document.getElementById('sendBtn').disabled = textarea.value.trim().length === 0;
+    }
+    
+    // Upload d'une image
+    async uploadImage() {
+        if (!this.currentImage) return;
+        
+        try {
+            const formData = new FormData();
+            formData.append('image', this.currentImage);
+            
+            const response = await fetch('/api/upload/image', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Envoyer le message avec l'image
+                this.socket.emit('send_message', {
+                    username: this.username,
+                    roomId: this.currentRoom.id,
+                    content: result.image.url,
+                    messageType: 'image'
+                });
+                
+                // Nettoyer l'interface
+                this.removeCurrentImage();
+                this.showSuccess('Image envoyée avec succès !');
+            } else {
+                this.showError(result.error || 'Erreur lors de l\'upload');
+            }
+        } catch (error) {
+            console.error('Erreur upload:', error);
+            this.showError('Erreur lors de l\'upload de l\'image');
+        }
     }
     
     // Notifications

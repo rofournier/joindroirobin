@@ -1,5 +1,6 @@
 const AuthService = require('../services/AuthService');
 const MessageService = require('../services/MessageService');
+const YouTubeService = require('../services/YouTubeService');
 const { Room, User, UserRoom } = require('../models');
 
 class ChatHandler {
@@ -8,6 +9,7 @@ class ChatHandler {
     this.userSockets = new Map(); // username -> socketId
     this.socketUsers = new Map(); // socketId -> username
     this.userRooms = new Map(); // username -> Set of roomIds
+    this.youtubeService = new YouTubeService();
   }
 
   /**
@@ -211,22 +213,35 @@ class ChatHandler {
         return;
       }
 
+      // Traiter le message pour YouTube si c'est du texte
+      let processedContent = content;
+      let youtubeInfo = null;
+      
+      if (messageType === 'text') {
+        const youtubeResult = this.youtubeService.processMessage(content);
+        if (youtubeResult.processed) {
+          processedContent = youtubeResult.message;
+          youtubeInfo = youtubeResult.videoInfo;
+        }
+      }
+
       // Envoyer le message
-      const message = await MessageService.sendMessage(username, roomId, content, messageType);
+      const message = await MessageService.sendMessage(username, roomId, processedContent, messageType);
       
       // Diffuser le message à tous les utilisateurs de la salle
       this.io.to(`room_${roomId}`).emit('new_message', {
         roomId,
         message: {
           id: message.id,
-          content: message.content,
+          content: processedContent,
           message_type: message.message_type,
           created_at: message.created_at,
           user: {
             id: message.user.id,
             username: message.user.username,
             avatar_url: message.user.avatar_url
-          }
+          },
+          youtubeInfo: youtubeInfo
         }
       });
 

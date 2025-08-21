@@ -3,6 +3,7 @@ const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
+const multer = require('multer');
 const db = require('./models');
 
 const app = express();
@@ -27,6 +28,24 @@ app.get('/', (req, res) => {
 
 // API routes
 const RoomService = require('./services/RoomService');
+const ImageService = require('./services/ImageService');
+const YouTubeService = require('./services/YouTubeService');
+
+// Configuration multer pour l'upload
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Type de fichier non supporté'), false);
+        }
+    }
+});
 
 app.get('/api/rooms', async (req, res) => {
   try {
@@ -94,6 +113,46 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send('Something broke!');
 });
+
+// Route d'upload d'images
+app.post('/api/upload/image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Aucune image fournie' 
+      });
+    }
+
+    const imageService = new ImageService();
+    const result = await imageService.processAndSaveImage(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        image: result
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Erreur lors de l\'upload:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erreur lors de l\'upload' 
+    });
+  }
+});
+
+// Route pour servir les images uploadées
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // 404 handler
 app.use((req, res) => {

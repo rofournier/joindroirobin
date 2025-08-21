@@ -14,9 +14,12 @@
     "build:js:watch": "webpack --mode development --watch",
     "build:prod": "tailwindcss -i ./src/css/input.css -o ./public/css/style.css --minify && webpack --mode production",
     "db:init": "node scripts/init-db.js",
+    "db:reset": "node scripts/init-db.js --reset",
     "db:migrate": "npx sequelize-cli db:migrate",
     "db:seed": "npx sequelize-cli db:seed:all",
-    "db:reset": "npx sequelize-cli db:drop && npx sequelize-cli db:create && npm run db:migrate && npm run db:seed"
+    "db:drop": "npx sequelize-cli db:drop",
+    "db:create": "npx sequelize-cli db:create",
+    "db:reset:legacy": "npx sequelize-cli db:drop && npx sequelize-cli db:create && npm run db:migrate && npm run db:seed"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

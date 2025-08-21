@@ -3,7 +3,16 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
+// Vérifier les arguments de ligne de commande
+const args = process.argv.slice(2);
+const shouldReset = args.includes('--reset') || args.includes('-r');
+const shouldForce = args.includes('--force') || args.includes('-f');
+
 console.log('🚀 Initialisation de la base de données JoindreRobin...\n');
+
+if (shouldReset) {
+  console.log('🔄 Mode RÉINITIALISATION activé - La base sera supprimée et recréée\n');
+}
 
 // Configuration de la base de données
 const config = {
@@ -33,22 +42,48 @@ try {
   process.exit(1);
 }
 
-// Créer la base de données si elle n'existe pas
+// Gérer la base de données (création ou réinitialisation)
 try {
   console.log('🗄️  Vérification de la base de données...');
   const checkDb = `psql -h ${config.host} -p ${config.port} -U ${config.username} -d postgres -c "SELECT 1 FROM pg_database WHERE datname='${config.database}';"`;
   const dbExists = execSync(checkDb, { stdio: 'pipe' }).toString();
   
-  if (!dbExists.includes('1 row')) {
+  if (dbExists.includes('1 row') || dbExists.includes('1 ligne')) {
+    if (shouldReset) {
+      console.log('🗑️  Suppression de la base de données existante...');
+      
+      // Fermer toutes les connexions actives
+      const closeConnections = `psql -h ${config.host} -p ${config.port} -U ${config.username} -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${config.database}' AND pid <> pg_backend_pid();"`;
+      try {
+        execSync(closeConnections, { stdio: 'pipe' });
+      } catch (error) {
+        // Ignorer les erreurs de fermeture de connexions
+      }
+      
+      // Supprimer la base
+      const dropDb = `dropdb -h ${config.host} -p ${config.port} -U ${config.username} ${config.database}`;
+      execSync(dropDb, { stdio: 'inherit' });
+      console.log('✅ Base de données supprimée\n');
+      
+      // Recréer la base
+      console.log('📝 Recréation de la base de données...');
+      const createDb = `createdb -h ${config.host} -p ${config.port} -U ${config.username} ${config.database}`;
+      execSync(createDb, { stdio: 'inherit' });
+      console.log('✅ Base de données recréée\n');
+    } else {
+      console.log('✅ Base de données existe déjà\n');
+      console.log('💡 Utilisez --reset pour réinitialiser complètement la base\n');
+      // Sortir ici car la base existe déjà et on ne veut pas la réinitialiser
+      process.exit(0);
+    }
+  } else {
     console.log('📝 Création de la base de données...');
     const createDb = `createdb -h ${config.host} -p ${config.port} -U ${config.username} ${config.database}`;
     execSync(createDb, { stdio: 'inherit' });
     console.log('✅ Base de données créée\n');
-  } else {
-    console.log('✅ Base de données existe déjà\n');
   }
 } catch (error) {
-  console.error('❌ Erreur lors de la création de la base de données:', error.message);
+  console.error('❌ Erreur lors de la gestion de la base de données:', error.message);
   process.exit(1);
 }
 
@@ -100,8 +135,15 @@ console.log('   - user_rooms (associations utilisateur-salle)');
 console.log('   - messages (messages de chat)');
 console.log('');
 console.log('👥 Données de démonstration:');
-console.log('   - 3 utilisateurs (JoindreRobin, Floune, ChatBot)');
-console.log('   - 4 salles (Général, Développement, Gaming, Musique)');
+console.log('   - 1 utilisateur Admin');
+console.log('   - 5 salles (Général, Cousins, Lardo, Les Gogols, Keur)');
 console.log('   - Messages et associations de démonstration');
 console.log('');
 console.log('🚀 Vous pouvez maintenant démarrer l\'application avec: npm start');
+console.log('');
+console.log('📖 Utilisation du script:');
+console.log('   npm run db:init          # Initialisation normale');
+console.log('   npm run db:reset         # Réinitialisation complète');
+console.log('   node scripts/init-db.js  # Exécution directe');
+console.log('   node scripts/init-db.js --reset  # Mode réinitialisation');
+console.log('   node scripts/init-db.js -r       # Mode réinitialisation (raccourci)');

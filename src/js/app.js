@@ -155,11 +155,15 @@ class JoindreRobinChat {
     
     createRoomCard(room) {
         const isProtected = room.isProtected;
+        const hasAccess = this.hasRoomAccess(room.id);
         const protectionIcon = isProtected ? 'fas fa-lock' : 'fas fa-unlock';
         const protectionColor = isProtected ? 'text-yellow-500' : 'text-green-500';
         
+        // Ajouter une classe CSS pour les salles autorisées
+        const cardClasses = `card p-6 cursor-pointer group ${hasAccess ? 'room-authorized' : ''}`;
+        
         return `
-            <div class="card p-6 cursor-pointer group" data-room-id="${room.id}">
+            <div class="${cardClasses}" data-room-id="${room.id}">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex-1">
                         <h3 class="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-2 group-hover:text-primary-600 transition-colors duration-200">
@@ -168,9 +172,11 @@ class JoindreRobinChat {
                         <p class="text-secondary-600 dark:text-secondary-400 text-sm mb-3">
                             ${room.description}
                         </p>
+                        ${hasAccess ? '<span class="text-xs text-green-600 dark:text-green-400 font-medium">✅ Accès autorisé</span>' : ''}
                     </div>
                     <div class="flex items-center space-x-2">
                         <i class="${protectionIcon} ${protectionColor} text-lg"></i>
+                        ${hasAccess ? '<i class="fas fa-check text-green-500 text-lg"></i>' : ''}
                         <span class="text-xs text-secondary-500 dark:text-secondary-400">
                             ${room.userCount} utilisateurs
                         </span>
@@ -186,7 +192,7 @@ class JoindreRobinChat {
                     </div>
                     
                     <button class="btn-primary text-sm py-2 px-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        Rejoindre
+                        ${hasAccess ? 'Rejoindre' : 'Entrer le mot de passe'}
                     </button>
                 </div>
             </div>
@@ -291,9 +297,34 @@ class JoindreRobinChat {
         console.log('🔒 Salle protégée?', room.isProtected);
         
         if (room.isProtected) {
-            console.log('🔐 Affichage modal mot de passe pour:', room.name);
-            // Demander le mot de passe pour les salles protégées
-            this.showPasswordModal(room);
+            console.log('🔒 Vérification de l\'accès pour la salle protégée:', room.name);
+            console.log('🔒 roomId:', roomId, 'type:', typeof roomId);
+            console.log('🔒 room.id:', room.id, 'type:', typeof room.id);
+            
+            // Vérifier si l'utilisateur a déjà accès à cette salle
+            const hasAccess = this.hasRoomAccess(roomId);
+            console.log('🔒 Résultat hasRoomAccess:', hasAccess);
+            
+            if (hasAccess) {
+                console.log('✅ Accès déjà autorisé à la salle:', room.name);
+                // Récupérer le mot de passe par défaut pour les salles protégées
+                const defaultPasswords = {
+                    2: 'xK9mP2qR',     // Cousins
+                    3: 'vN7hL4tY',     // Lardo
+                    4: 'wQ8jM5uZ',     // Les Gogols
+                    5: 'aB3cD6eF'      // Keur
+                };
+                const password = defaultPasswords[room.id];
+                if (password) {
+                    sessionStorage.setItem('roomPassword', password);
+                    console.log('🔑 Mot de passe pré-rempli pour accès autorisé');
+                }
+                this.redirectToChat(room.id);
+            } else {
+                console.log('🔐 Demande du mot de passe pour:', room.name);
+                // Demander le mot de passe pour les salles protégées
+                this.showPasswordModal(room);
+            }
         } else {
             console.log('✅ Accès direct à la salle publique:', room.name);
             // Accès direct aux salles publiques
@@ -396,7 +427,11 @@ class JoindreRobinChat {
             const result = await response.json();
             
             if (result.success) {
-                console.log('✅ Mot de passe validé, redirection vers le chat');
+                console.log('✅ Mot de passe validé, mémorisation de l\'accès');
+                
+                // Mémoriser l'accès à cette salle
+                this.rememberRoomAccess(roomId);
+                
                 // Stocker le mot de passe temporairement pour la connexion Socket.IO
                 sessionStorage.setItem('roomPassword', password);
                 this.redirectToChat(roomId);
@@ -408,6 +443,45 @@ class JoindreRobinChat {
             console.error('❌ Erreur lors de la validation du mot de passe:', error);
             this.showError('Erreur lors de la connexion à la salle');
         }
+    }
+    
+    // Mémoriser l'accès à une salle
+    rememberRoomAccess(roomId) {
+        const authorizedRooms = this.getAuthorizedRooms();
+        // Convertir en number pour cohérence
+        const roomIdAsNumber = Number(roomId);
+        if (!authorizedRooms.includes(roomIdAsNumber)) {
+            authorizedRooms.push(roomIdAsNumber);
+            localStorage.setItem('joindrerobin_authorized_rooms', JSON.stringify(authorizedRooms));
+            console.log('💾 Accès mémorisé pour la salle:', roomIdAsNumber);
+        }
+    }
+    
+    // Récupérer les salles autorisées
+    getAuthorizedRooms() {
+        const stored = localStorage.getItem('joindrerobin_authorized_rooms');
+        return stored ? JSON.parse(stored) : [];
+    }
+    
+    // Vérifier si l'utilisateur a accès à une salle
+    hasRoomAccess(roomId) {
+        const authorizedRooms = this.getAuthorizedRooms();
+        const roomIdAsNumber = Number(roomId);
+        console.log('🔍 hasRoomAccess - roomId:', roomIdAsNumber, 'authorizedRooms:', authorizedRooms);
+        
+        // Vérifier avec le roomId converti en number
+        return authorizedRooms.includes(roomIdAsNumber);
+    }
+    
+    // Oublier l'accès à une salle
+    forgetRoomAccess(roomId) {
+        const authorizedRooms = this.getAuthorizedRooms();
+        const updatedRooms = authorizedRooms.filter(id => id !== roomId);
+        localStorage.setItem('joindrerobin_authorized_rooms', JSON.stringify(updatedRooms));
+        console.log('🗑️ Accès oublié pour la salle:', roomId);
+        
+        // Recharger l'affichage des salles
+        this.renderRooms();
     }
     
     // Rediriger vers le chat

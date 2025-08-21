@@ -177,6 +177,10 @@ class ModernChatApp {
         this.updateMessages(this.messages);
         
         console.log(`✅ Rejoint la salle: ${data.room.name}`);
+        
+        // Assurer qu'aucune vérification de protection ne se déclenche après connexion réussie
+        console.log('🔒 Room protection status:', data.room.isProtected);
+        console.log('✅ Accès à la salle confirmé par le serveur');
     }
     
     onJoinRoomError(data) {

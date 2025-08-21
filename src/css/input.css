@@ -62,4 +62,13 @@
   .glass-effect {
     @apply bg-white/80 dark:bg-secondary-800/80 backdrop-blur-md border border-white/20 dark:border-secondary-700/20;
   }
+  
+  /* Salles autorisées */
+  .room-authorized {
+    @apply border-l-4 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50;
+  }
+  
+  .dark .room-authorized {
+    @apply bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-l-green-400;
+  }
 }

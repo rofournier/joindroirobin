@@ -85,10 +85,14 @@ class LobbyApp {
       userName.textContent = this.currentUser.username;
     }
 
-    // Nom d'utilisateur dans le menu
-    const userNameMenu = document.getElementById('userNameMenu');
-    if (userNameMenu && this.currentUser) {
-      userNameMenu.textContent = this.currentUser.username;
+    // Éléments du drawer
+    const drawerUserInitial = document.getElementById('drawerUserInitial');
+    const drawerUserName = document.getElementById('drawerUserName');
+    if (drawerUserInitial && this.currentUser) {
+      drawerUserInitial.textContent = this.currentUser.username.charAt(0).toUpperCase();
+    }
+    if (drawerUserName && this.currentUser) {
+      drawerUserName.textContent = this.currentUser.username;
     }
   }
 
@@ -96,18 +100,37 @@ class LobbyApp {
    * Configurer les écouteurs d'événements
    */
   setupEventListeners() {
-    // Menu utilisateur
+    // Drawer utilisateur mobile-first
     const userMenuButton = document.getElementById('userMenuButton');
-    if (userMenuButton) {
+    const userDrawer = document.getElementById('userDrawer');
+    const closeDrawer = document.getElementById('closeDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    const drawerLogoutButton = document.getElementById('drawerLogoutButton');
+
+    if (userMenuButton && userDrawer) {
+      // Ouvrir le drawer
       userMenuButton.addEventListener('click', () => {
-        this.toggleUserMenu();
+        this.openUserDrawer();
       });
     }
 
-    // Bouton déconnexion
-    const logoutButton = document.getElementById('logoutButton');
-    if (logoutButton) {
-      logoutButton.addEventListener('click', () => {
+    if (closeDrawer && userDrawer) {
+      // Fermer le drawer
+      closeDrawer.addEventListener('click', () => {
+        this.closeUserDrawer();
+      });
+    }
+
+    if (drawerOverlay && userDrawer) {
+      // Fermer avec l'overlay
+      drawerOverlay.addEventListener('click', () => {
+        this.closeUserDrawer();
+      });
+    }
+
+    if (drawerLogoutButton) {
+      // Déconnexion depuis le drawer
+      drawerLogoutButton.addEventListener('click', () => {
         this.logout();
       });
     }
@@ -120,12 +143,40 @@ class LobbyApp {
       });
     }
 
-    // Fermer le menu en cliquant à l'extérieur
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#userMenu') && !e.target.closest('#userMenuButton')) {
-        this.hideUserMenu();
+    // Fermer avec Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.closeUserDrawer();
       }
     });
+  }
+
+  /**
+   * Ouvrir le drawer utilisateur
+   */
+  openUserDrawer() {
+    const userDrawer = document.getElementById('userDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    if (userDrawer && drawerOverlay) {
+      userDrawer.classList.remove('translate-x-full');
+      userDrawer.classList.add('translate-x-0');
+      drawerOverlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden'; // Empêcher le scroll
+    }
+  }
+
+  /**
+   * Fermer le drawer utilisateur
+   */
+  closeUserDrawer() {
+    const userDrawer = document.getElementById('userDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    if (userDrawer && drawerOverlay) {
+      userDrawer.classList.remove('translate-x-0');
+      userDrawer.classList.add('translate-x-full');
+      drawerOverlay.classList.add('hidden');
+      document.body.style.overflow = ''; // Restaurer le scroll
+    }
   }
 
   /**
@@ -170,6 +221,12 @@ class LobbyApp {
 
     roomsGrid.innerHTML = '';
     
+    // Mettre à jour le compteur
+    const roomsCount = document.getElementById('roomsCount');
+    if (roomsCount) {
+      roomsCount.textContent = `${this.rooms.length} salle${this.rooms.length > 1 ? 's' : ''}`;
+    }
+    
     this.rooms.forEach(room => {
       const roomCard = this.createRoomCard(room);
       roomsGrid.appendChild(roomCard);
@@ -181,50 +238,77 @@ class LobbyApp {
    */
   createRoomCard(room) {
     const card = document.createElement('div');
-    card.className = 'bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-colors cursor-pointer';
+    card.className = 'bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-all duration-200 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]';
     
     // Déterminer le statut et la couleur
-    let statusText, statusColor, actionText, actionColor;
+    let statusText, statusColor, actionText, actionColor, statusIcon;
     
     if (room.userHasAccess) {
       statusText = 'Accès autorisé';
       statusColor = 'text-green-400';
       actionText = 'Rejoindre';
-      actionColor = 'bg-green-500 hover:bg-green-600';
+      actionColor = 'bg-green-500 hover:bg-green-600 active:bg-green-700';
+      statusIcon = '✅';
     } else if (room.is_protected) {
       statusText = 'Mot de passe requis';
       statusColor = 'text-yellow-400';
       actionText = 'Rejoindre';
-      actionColor = 'bg-blue-500 hover:bg-blue-600';
+      actionColor = 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700';
+      statusIcon = '🔒';
     } else {
       statusText = 'Accès libre';
       statusColor = 'text-blue-400';
       actionText = 'Rejoindre';
-      actionColor = 'bg-blue-500 hover:bg-blue-600';
+      actionColor = 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700';
+      statusIcon = '🌐';
     }
-
+    
+    // Déterminer le nombre d'utilisateurs
+    const userCount = room.userCount || 0;
+    const maxUsers = room.max_users || 50;
+    const userCountText = `${userCount}/${maxUsers}`;
+    const userCountColor = userCount >= maxUsers ? 'text-red-400' : userCount > maxUsers * 0.8 ? 'text-yellow-400' : 'text-green-400';
+    const userCountIcon = userCount >= maxUsers ? '🚫' : userCount > maxUsers * 0.8 ? '⚠️' : '👥';
+    
     card.innerHTML = `
-      <div class="flex items-start justify-between mb-3">
-        <div class="flex-1">
-          <h3 class="text-lg font-semibold text-white mb-1">${room.name}</h3>
-          <p class="text-sm text-gray-400 mb-2">${room.description || 'Aucune description'}</p>
-          <div class="flex items-center space-x-4 text-xs">
-            <span class="${statusColor}">${statusText}</span>
-            <span class="text-gray-500">${room.userCount || 0} utilisateur(s)</span>
+      <div class="space-y-3">
+        <!-- Header avec titre et statut -->
+        <div class="flex items-start justify-between">
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg font-semibold text-white mb-1 truncate">${room.name}</h3>
+            <p class="text-gray-400 text-sm line-clamp-2">${room.description || 'Aucune description'}</p>
+          </div>
+          <div class="flex-shrink-0 ml-3">
+            <span class="text-2xl">${statusIcon}</span>
           </div>
         </div>
-        <div class="ml-3">
-          ${room.is_protected ? '<span class="text-yellow-400 text-2xl">🔒</span>' : '<span class="text-blue-400 text-2xl">🌐</span>'}
+        
+        <!-- Informations de statut -->
+        <div class="flex items-center justify-between text-sm">
+          <span class="${statusColor} font-medium">${statusText}</span>
+          <span class="${userCountColor} flex items-center space-x-1">
+            <span>${userCountIcon}</span>
+            <span>${userCountText}</span>
+          </span>
+        </div>
+        
+        <!-- Bouton d'action -->
+        <div class="pt-2">
+          <button class="w-full ${actionColor} text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform active:scale-95">
+            ${actionText}
+          </button>
         </div>
       </div>
-      <button class="w-full ${actionColor} text-white py-2 px-4 rounded-lg font-medium transition-colors">
-        ${actionText}
-      </button>
     `;
 
     // Ajouter l'événement de clic
     card.addEventListener('click', () => {
       this.joinRoom(room);
+      // Feedback tactile
+      card.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        card.style.transform = '';
+      }, 150);
     });
 
     return card;
@@ -355,25 +439,7 @@ class LobbyApp {
     }
   }
 
-  /**
-   * Afficher/masquer le menu utilisateur
-   */
-  toggleUserMenu() {
-    const menu = document.getElementById('userMenu');
-    if (menu) {
-      menu.classList.toggle('hidden');
-    }
-  }
 
-  /**
-   * Masquer le menu utilisateur
-   */
-  hideUserMenu() {
-    const menu = document.getElementById('userMenu');
-    if (menu) {
-      menu.classList.add('hidden');
-    }
-  }
 
   /**
    * Charger le thème
@@ -389,15 +455,68 @@ class LobbyApp {
   applyTheme() {
     const sunIcon = document.getElementById('sunIcon');
     const moonIcon = document.getElementById('moonIcon');
+    const body = document.body;
     
     if (this.currentTheme === 'light') {
+      // Thème clair
       document.documentElement.classList.remove('dark');
+      body.classList.remove('bg-gray-900');
+      body.classList.add('bg-gray-50');
+      
+      // Mettre à jour les icônes
       if (sunIcon) sunIcon.classList.remove('hidden');
       if (moonIcon) moonIcon.classList.add('hidden');
+      
+      // Mettre à jour le header
+      this.updateHeaderTheme('light');
+      
     } else {
+      // Thème sombre
       document.documentElement.classList.add('dark');
+      body.classList.remove('bg-gray-50');
+      body.classList.add('bg-gray-900');
+      
+      // Mettre à jour les icônes
       if (sunIcon) sunIcon.classList.add('hidden');
       if (moonIcon) moonIcon.classList.remove('hidden');
+      
+      // Mettre à jour le header
+      this.updateHeaderTheme('dark');
+    }
+  }
+
+  /**
+   * Mettre à jour le thème du header
+   */
+  updateHeaderTheme(theme) {
+    const header = document.querySelector('header');
+    if (!header) return;
+    
+    if (theme === 'light') {
+      header.classList.remove('bg-gray-800', 'border-gray-700');
+      header.classList.add('bg-white', 'border-gray-200', 'shadow-md');
+      
+      // Mettre à jour les textes
+      const title = header.querySelector('h1');
+      if (title) title.classList.remove('text-white');
+      if (title) title.classList.add('text-gray-900');
+      
+      const subtitle = header.querySelector('p');
+      if (subtitle) subtitle.classList.remove('text-gray-400');
+      if (subtitle) subtitle.classList.add('text-gray-600');
+      
+    } else {
+      header.classList.remove('bg-white', 'border-gray-200', 'shadow-md');
+      header.classList.add('bg-gray-800', 'border-gray-700');
+      
+      // Mettre à jour les textes
+      const title = header.querySelector('h1');
+      if (title) title.classList.remove('text-gray-900');
+      if (title) title.classList.add('text-white');
+      
+      const subtitle = header.querySelector('p');
+      if (subtitle) subtitle.classList.remove('text-gray-600');
+      if (subtitle) subtitle.classList.add('text-gray-400');
     }
   }
 

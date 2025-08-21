@@ -1,4 +1,5 @@
 const { DataTypes } = require('sequelize');
+const bcrypt = require('bcrypt');
 
 module.exports = (sequelize) => {
   const User = sequelize.define('User', {
@@ -16,17 +17,23 @@ module.exports = (sequelize) => {
         notEmpty: true
       }
     },
+    password_hash: {
+      type: DataTypes.STRING(255),
+      allowNull: false, // Maintenant requis pour l'authentification
+      validate: {
+        notEmpty: true
+      }
+    },
     email: {
       type: DataTypes.STRING(255),
       allowNull: true,
       unique: true,
       validate: {
-        isEmail: true
+        isEmail: {
+          args: true,
+          msg: 'Format d\'email invalide'
+        }
       }
-    },
-    password_hash: {
-      type: DataTypes.STRING(255),
-      allowNull: true // Pour l'instant, on n'a pas d'authentification
     },
     is_online: {
       type: DataTypes.BOOLEAN,
@@ -61,6 +68,15 @@ module.exports = (sequelize) => {
       }
     ]
   });
+
+  // Méthodes d'instance pour l'authentification
+  User.prototype.validatePassword = async function(password) {
+    return await bcrypt.compare(password, this.password_hash);
+  };
+
+  User.prototype.setPassword = async function(password) {
+    this.password_hash = await bcrypt.hash(password, 10);
+  };
 
   User.associate = (models) => {
     // Un utilisateur peut être dans plusieurs salles

@@ -1,50 +1,63 @@
+const { Room, User, UserRoom } = require('../models');
 const AuthService = require('../services/AuthService');
 const MessageService = require('../services/MessageService');
 const YouTubeService = require('../services/YouTubeService');
-const { Room, User, UserRoom } = require('../models');
 
 class ChatHandler {
   constructor(io) {
     this.io = io;
     this.userSockets = new Map(); // username -> socketId
     this.socketUsers = new Map(); // socketId -> username
-    this.userRooms = new Map(); // username -> Set of roomIds
+    this.userRooms = new Map(); // username -> Set<roomId>
     this.youtubeService = new YouTubeService();
+    
+    this.initialize();
   }
 
-  /**
-   * Initialiser les gestionnaires Socket.IO
-   */
   initialize() {
     this.io.on('connection', (socket) => {
       console.log(`🔌 Nouvelle connexion: ${socket.id}`);
+      
+      // Authentifier la connexion Socket.IO
+      socket.on('authenticate', async (data) => {
+        await this.handleAuthentication(socket, data);
+      });
 
-      // Gestion de la connexion à une salle
+      // Événements après authentification
       socket.on('join_room', async (data) => {
+        if (!socket.user) {
+          socket.emit('error', { message: 'Authentification requise' });
+          return;
+        }
         await this.handleJoinRoom(socket, data);
       });
 
-      // Gestion de la sortie d'une salle
       socket.on('leave_room', async (data) => {
+        if (!socket.user) {
+          socket.emit('error', { message: 'Authentification requise' });
+          return;
+        }
         await this.handleLeaveRoom(socket, data);
       });
 
-      // Gestion de l'envoi de message
       socket.on('send_message', async (data) => {
+        if (!socket.user) {
+          socket.emit('error', { message: 'Authentification requise' });
+          return;
+        }
         await this.handleSendMessage(socket, data);
       });
 
-      // Gestion de la frappe
       socket.on('typing', (data) => {
+        if (!socket.user) return;
         this.handleTyping(socket, data);
       });
 
-      // Gestion de l'arrêt de frappe
       socket.on('stop_typing', (data) => {
+        if (!socket.user) return;
         this.handleStopTyping(socket, data);
       });
 
-      // Gestion de la déconnexion
       socket.on('disconnect', async () => {
         await this.handleDisconnect(socket);
       });
@@ -52,23 +65,63 @@ class ChatHandler {
   }
 
   /**
+   * Authentifier une connexion Socket.IO
+   */
+  async handleAuthentication(socket, data) {
+    try {
+      // Récupérer le token depuis les cookies de la requête HTTP
+      const token = socket.handshake.auth.token || socket.handshake.headers.cookie?.match(/authToken=([^;]+)/)?.[1];
+      
+      if (!token) {
+        socket.emit('authentication_error', { message: 'Token d\'authentification requis' });
+        return;
+      }
+
+      // Vérifier le token JWT
+      const result = AuthService.verifyToken(token);
+      
+      if (!result.valid) {
+        socket.emit('authentication_error', { message: 'Token invalide ou expiré' });
+        return;
+      }
+
+      // Stocker les informations utilisateur dans le socket
+      socket.user = result.user;
+      
+      // Stocker les informations de connexion
+      this.userSockets.set(result.user.username, socket.id);
+      this.socketUsers.set(socket.id, result.user.username);
+      
+      console.log(`✅ ${result.user.username} authentifié avec succès`);
+      socket.emit('authenticated', { user: result.user });
+      
+    } catch (error) {
+      console.error('Erreur lors de l\'authentification:', error);
+      socket.emit('authentication_error', { message: 'Erreur d\'authentification' });
+    }
+  }
+
+  /**
    * Gérer la connexion à une salle
    */
   async handleJoinRoom(socket, data) {
     try {
-      const { username, roomId, password } = data;
+      const { roomId, password } = data;
+      const username = socket.user.username;
+      const userId = socket.user.id;
       
-      if (!username || !roomId) {
-        socket.emit('error', { message: 'Username et roomId requis' });
+      if (!roomId) {
+        socket.emit('error', { message: 'RoomId requis' });
         return;
       }
 
       console.log(`🚪 ${username} tente de rejoindre la salle ${roomId}`);
 
       // Vérifier l'accès à la salle
-      const accessCheck = await AuthService.canUserAccessRoom(username, roomId, password);
+      const accessCheck = await AuthService.canUserAccessRoom(userId, roomId, password);
       
       if (!accessCheck.canAccess) {
+        console.log(`❌ Accès refusé: ${accessCheck.reason}`);
         socket.emit('join_room_error', { 
           roomId, 
           reason: accessCheck.reason 
@@ -76,8 +129,10 @@ class ChatHandler {
         return;
       }
 
+      console.log(`✅ Accès autorisé: ${accessCheck.reason}`);
+
       // Ajouter l'utilisateur à la salle
-      const result = await AuthService.addUserToRoom(username, roomId);
+      const result = await AuthService.addUserToRoom(userId, roomId);
       
       if (!result.success) {
         socket.emit('error', { message: 'Erreur lors de l\'ajout à la salle' });
@@ -88,9 +143,6 @@ class ChatHandler {
       socket.join(`room_${roomId}`);
       
       // Stocker les informations utilisateur
-      this.userSockets.set(username, socket.id);
-      this.socketUsers.set(socket.id, username);
-      
       if (!this.userRooms.has(username)) {
         this.userRooms.set(username, new Set());
       }
@@ -115,7 +167,7 @@ class ChatHandler {
       });
 
       // Confirmer la connexion à la salle
-      socket.emit('room_joined', {
+      socket.emit('join_room_success', {
         roomId,
         room: {
           id: room.id,
@@ -132,9 +184,9 @@ class ChatHandler {
         username,
         roomId,
         user: {
-          id: result.user.id,
-          username: result.user.username,
-          avatar_url: result.user.avatar_url
+          id: socket.user.id,
+          username: socket.user.username,
+          avatar_url: socket.user.avatar_url
         }
       });
 
@@ -154,17 +206,19 @@ class ChatHandler {
    */
   async handleLeaveRoom(socket, data) {
     try {
-      const { username, roomId } = data;
+      const { roomId } = data;
+      const username = socket.user.username;
+      const userId = socket.user.id;
       
-      if (!username || !roomId) {
-        socket.emit('error', { message: 'Username et roomId requis' });
+      if (!roomId) {
+        socket.emit('error', { message: 'RoomId requis' });
         return;
       }
 
       console.log(`🚪 ${username} quitte la salle ${roomId}`);
 
       // Retirer l'utilisateur de la salle
-      await AuthService.removeUserFromRoom(username, roomId);
+      await AuthService.removeUserFromRoom(userId, roomId);
 
       // Quitter la salle Socket.IO
       socket.leave(`room_${roomId}`);
@@ -199,50 +253,72 @@ class ChatHandler {
    */
   async handleSendMessage(socket, data) {
     try {
-      const { username, roomId, content, messageType = 'text' } = data;
+      const { roomId, content, messageType = 'text', youtubeInfo, imageInfo } = data;
+      const username = socket.user.username;
+      const userId = socket.user.id;
       
-      if (!username || !roomId || !content) {
-        socket.emit('error', { message: 'Username, roomId et content requis' });
+      if (!roomId || !content) {
+        socket.emit('error', { message: 'RoomId et contenu requis' });
         return;
       }
 
       // Vérifier que l'utilisateur est dans la salle
-      const isInRoom = await AuthService.isUserInRoom(username, roomId);
-      if (!isInRoom) {
+      const userRoom = await UserRoom.findOne({
+        where: { user_id: userId, room_id: roomId, is_active: true }
+      });
+      
+      if (!userRoom) {
         socket.emit('error', { message: 'Vous devez être dans la salle pour envoyer un message' });
         return;
       }
 
       // Traiter le message pour YouTube si c'est du texte
       let processedContent = content;
-      let youtubeInfo = null;
+      let finalYoutubeInfo = youtubeInfo || null;
       
-      if (messageType === 'text') {
+      if (messageType === 'text' && !youtubeInfo) {
         const youtubeResult = this.youtubeService.processMessage(content);
         if (youtubeResult.processed) {
           processedContent = youtubeResult.message;
-          youtubeInfo = youtubeResult.videoInfo;
+          finalYoutubeInfo = youtubeResult.videoInfo;
         }
       }
 
       // Envoyer le message
-      const message = await MessageService.sendMessage(username, roomId, processedContent, messageType);
+      const message = await MessageService.sendMessage(username, roomId, processedContent, messageType, imageInfo);
+      
+      // Préparer les données du message pour la diffusion
+      const messageData = {
+        id: message.id,
+        content: processedContent,
+        message_type: message.message_type,
+        created_at: message.created_at,
+        user: {
+          id: message.user.id,
+          username: message.user.username,
+          avatar_url: message.user.avatar_url
+        }
+      };
+
+      // Ajouter les informations spécifiques selon le type
+      if (finalYoutubeInfo) {
+        messageData.youtubeInfo = finalYoutubeInfo;
+      }
+      if (imageInfo) {
+        messageData.imageInfo = imageInfo;
+      }
+
+      // Ajouter les informations de fichier si présentes en base
+      if (message.file_url) {
+        messageData.file_url = message.file_url;
+        messageData.file_name = message.file_name;
+        messageData.file_size = message.file_size;
+      }
       
       // Diffuser le message à tous les utilisateurs de la salle
       this.io.to(`room_${roomId}`).emit('new_message', {
         roomId,
-        message: {
-          id: message.id,
-          content: processedContent,
-          message_type: message.message_type,
-          created_at: message.created_at,
-          user: {
-            id: message.user.id,
-            username: message.user.username,
-            avatar_url: message.user.avatar_url
-          },
-          youtubeInfo: youtubeInfo
-        }
+        message: messageData
       });
 
       console.log(`💬 ${username} a envoyé un message dans la salle ${roomId}`);
@@ -257,8 +333,10 @@ class ChatHandler {
    * Gérer la frappe
    */
   handleTyping(socket, data) {
-    const { username, roomId } = data;
-    if (username && roomId) {
+    const { roomId } = data;
+    const username = socket.user.username;
+    
+    if (roomId) {
       socket.to(`room_${roomId}`).emit('user_typing', { username, roomId });
     }
   }
@@ -267,8 +345,10 @@ class ChatHandler {
    * Gérer l'arrêt de frappe
    */
   handleStopTyping(socket, data) {
-    const { username, roomId } = data;
-    if (username && roomId) {
+    const { roomId } = data;
+    const username = socket.user.username;
+    
+    if (roomId) {
       socket.to(`room_${roomId}`).emit('user_stop_typing', { username, roomId });
     }
   }
@@ -278,28 +358,15 @@ class ChatHandler {
    */
   async handleDisconnect(socket) {
     try {
-      const username = this.socketUsers.get(socket.id);
-      
-      if (username) {
+      if (socket.user) {
+        const username = socket.user.username;
         console.log(`🔌 Déconnexion de ${username}`);
         
-        // Retirer l'utilisateur de toutes ses salles
-        if (this.userRooms.has(username)) {
-          for (const roomId of this.userRooms.get(username)) {
-            await AuthService.removeUserFromRoom(username, roomId);
-            
-            // Notifier les autres utilisateurs
-            socket.to(`room_${roomId}`).emit('user_left', {
-              username,
-              roomId
-            });
-            
-            // Mettre à jour le compteur d'utilisateurs
-            this.updateRoomUserCount(roomId);
-          }
-        }
-
-        // Nettoyer les données locales
+        // Ne pas retirer l'utilisateur des salles lors de la déconnexion Socket.IO
+        // Il peut se reconnecter plus tard et garder son accès
+        console.log(`ℹ️ ${username} reste dans ses salles (déconnexion Socket.IO)`);
+        
+        // Nettoyer seulement les données locales
         this.userSockets.delete(username);
         this.userRooms.delete(username);
         this.socketUsers.delete(socket.id);

@@ -5,300 +5,231 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JoindreRobin - Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-        /* Styles pour les images dans le chat */
-        .chat-image {
-            max-width: 300px;
-            max-height: 300px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .chat-image:hover {
-            transform: scale(1.02);
-        }
-        
-        /* Styles pour YouTube */
-        .youtube-embed-container {
-            margin: 8px 0;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        
-        .youtube-iframe {
-            width: 100%;
-            height: 200px;
-            border: none;
-        }
-        
-        .youtube-info {
-            background: rgba(0, 0, 0, 0.05);
-            padding: 8px 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .youtube-thumbnail {
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-        }
-        
-        .youtube-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-decoration: none;
-            color: #666;
-            font-size: 12px;
-        }
-        
-        .youtube-link:hover {
-            color: #ff0000;
-        }
-        
-        /* Modal pour les images agrandies */
-        .image-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            cursor: pointer;
-        }
-        
-        .image-modal img {
-            max-width: 90%;
-            max-height: 90%;
-            object-fit: contain;
-            border-radius: 8px;
-        }
-    </style>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 h-screen flex flex-col">
-    
-    <!-- Header moderne -->
-    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div class="flex items-center justify-between px-4 py-3">
-            <!-- Bouton retour et info de la salle -->
-            <div class="flex items-center space-x-3">
-                <button id="backBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+<body class="bg-gray-900 h-screen flex flex-col">
+    <!-- Header mobile-first -->
+    <header class="chat-header bg-gray-800 shadow-lg border-b border-gray-700 flex-shrink-0">
+        <div class="px-4 py-3">
+            <div class="flex items-center justify-between">
+                <!-- Bouton retour au lobby -->
+                <button id="backToLobby" class="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
                 </button>
-                <div>
-                    <h1 id="roomName" class="text-lg font-semibold text-gray-900 dark:text-white">Nom de la salle</h1>
-                    <p id="roomDescription" class="text-sm text-gray-500 dark:text-gray-400">Description de la salle</p>
+                
+                <!-- Titre de la salle -->
+                <div class="flex-1 text-center">
+                    <h1 id="roomTitle" class="text-lg font-semibold text-white">Chargement...</h1>
+                    <p id="roomStatus" class="text-xs text-gray-400">Connexion en cours</p>
                 </div>
-            </div>
-            
-            <!-- Menu de la salle -->
-            <div class="flex items-center space-x-2">
-                <button id="roomMenuBtn" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                
+                <!-- Menu utilisateur -->
+                <button id="userMenuButton" class="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Menu de la salle (dropdown) -->
-    <div id="roomMenu" class="hidden absolute top-16 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 min-w-48">
-        <div class="py-2">
-            <button id="showUsersBtn" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                </svg>
-                <span>Voir les utilisateurs</span>
-            </button>
-            <button id="roomInfoBtn" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span>Infos de la salle</span>
-            </button>
-            <hr class="my-2 border-gray-200 dark:border-gray-700">
-            <button id="leaveRoomBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                </svg>
-                <span>Quitter la salle</span>
-            </button>
-        </div>
-    </div>
-
     <!-- Contenu principal -->
-    <main class="flex-1 flex overflow-hidden">
-        
-        <!-- Zone des messages -->
-        <div class="flex-1 flex flex-col">
-            
-            <!-- Zone de messages avec scroll -->
-            <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
-                <!-- Les messages seront injectés ici -->
-            </div>
-            
-            <!-- Indicateur de frappe -->
-            <div id="typingIndicator" class="hidden px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                <p class="text-sm text-gray-500 dark:text-gray-400 italic">
-                    <span id="typingUsers"></span> est en train d'écrire...
-                </p>
-            </div>
-            
-            <!-- Zone de saisie moderne -->
-            <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-                <div class="flex items-end space-x-3">
-                    <!-- Bouton d'upload d'image -->
-                    <button 
-                        id="uploadImageBtn" 
-                        class="p-3 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 transition-colors duration-200 flex-shrink-0"
-                        title="Ajouter une image"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Zone de chat (visible par défaut) -->
+        <div id="chatZone" class="flex-1 flex flex-col">
+            <!-- Messages -->
+            <div class="messages flex-1 overflow-y-auto p-4 space-y-3" style="max-height: calc(100vh - 200px);">
+                <div class="text-center text-gray-400 py-8">
+                    <div class="w-16 h-16 mx-auto mb-4 bg-gray-700 rounded-full flex items-center justify-center">
+                        <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                         </svg>
-                    </button>
-                    
-                    <!-- Input file caché -->
-                    <input 
-                        type="file" 
-                        id="imageInput" 
-                        accept="image/*" 
-                        class="hidden"
-                    >
-                    
-                    <!-- Zone de texte avec auto-resize -->
-                    <div class="flex-1 relative">
-                        <textarea 
-                            id="messageInput" 
-                            class="w-full resize-none border border-gray-300 dark:border-gray-600 rounded-2xl px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            placeholder="Tapez votre message..."
-                            rows="1"
-                            maxlength="1000"
-                        ></textarea>
+                    </div>
+                    <p class="text-sm">Connexion à la salle...</p>
+                </div>
+            </div>
+
+            <!-- Indicateur de frappe -->
+            <div id="typingIndicator" class="px-4 py-2 text-sm text-gray-400 italic hidden">
+                <!-- L'indicateur de frappe sera injecté par JavaScript -->
+            </div>
+
+            <!-- Formulaire d'envoi mobile-first -->
+            <div class="border-t border-gray-700 p-4 bg-gray-800">
+                <form id="messageForm" class="flex items-end space-x-3">
+                    <!-- Boutons d'action -->
+                    <div class="flex flex-col space-y-2 mr-2">
+                        <!-- Upload d'image -->
+                        <button type="button" id="imageUploadBtn" 
+                                class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
                         
-                        <!-- Compteur de caractères -->
-                        <div class="absolute bottom-2 right-3 text-xs text-gray-400 dark:text-gray-500">
+                        <!-- Partage YouTube -->
+                        <button type="button" id="youtubeBtn" 
+                                class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="flex-1 relative">
+                        <textarea id="messageInput" 
+                                  class="w-full px-4 py-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white resize-none"
+                                  placeholder="Tapez votre message..."
+                                  maxlength="1000"
+                                  rows="1"
+                                  style="min-height: 44px; max-height: 120px;"></textarea>
+                        <div class="absolute bottom-2 right-2 text-xs text-gray-500">
                             <span id="charCount">0</span>/1000
                         </div>
                     </div>
                     
-                    <!-- Bouton d'envoi -->
-                    <button 
-                        id="sendBtn" 
-                        class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-full p-3 transition-colors duration-200 flex-shrink-0"
-                        disabled
-                    >
+                    <button type="submit" 
+                            class="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-medium flex-shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                         </svg>
                     </button>
-                </div>
+                </form>
                 
-                <!-- Prévisualisation de l'image -->
-                <div id="imagePreview" class="hidden mt-3">
-                    <div class="relative inline-block">
-                        <img id="previewImg" class="max-w-xs max-h-32 rounded-lg object-cover" alt="Prévisualisation">
-                        <button id="removeImageBtn" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+                <!-- Input file caché pour l'upload -->
+                <input type="file" id="imageFileInput" accept="image/*" class="hidden">
             </div>
         </div>
-        
-        <!-- Sidebar des utilisateurs (masquée sur mobile) -->
-        <div id="usersSidebar" class="hidden lg:block w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Utilisateurs en ligne</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                    <span id="userCount">0</span> utilisateur(s)
-                </p>
-            </div>
-            
-            <div id="usersList" class="p-4 space-y-3">
-                <!-- Les utilisateurs seront injectés ici -->
-            </div>
-        </div>
-    </main>
 
-    <!-- Modal des utilisateurs (mobile) -->
-    <div id="usersModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
-        <div class="fixed inset-y-0 right-0 w-80 bg-white dark:bg-gray-800 shadow-xl">
-            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Utilisateurs</h3>
-                <button id="closeUsersModal" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <div id="mobileUsersList" class="p-4 space-y-3">
-                <!-- Les utilisateurs seront injectés ici -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal d'infos de la salle -->
-    <div id="roomInfoModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
-            <div class="p-6">
+        <!-- Informations de la salle (overlay mobile) -->
+        <div id="roomInfoOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+            <div class="absolute bottom-0 left-0 right-0 bg-gray-800 rounded-t-3xl p-6 max-h-96 overflow-y-auto">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Informations de la salle</h3>
-                    <button id="closeRoomInfoModal" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h3 class="text-lg font-semibold text-white">Informations de la salle</h3>
+                    <button id="closeRoomInfo" class="text-gray-400 hover:text-white p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
                 </div>
-                
-                <div class="space-y-4">
+                <div id="roomInfoContent" class="space-y-4">
+                    <!-- Le contenu sera injecté par JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu utilisateur (overlay mobile) -->
+        <div id="userMenuOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+            <div class="absolute top-0 right-0 mt-16 mr-4 bg-gray-800 rounded-xl shadow-xl p-4 min-w-48">
+                <div class="flex items-center space-x-3 mb-4 p-3 bg-gray-700 rounded-lg">
+                    <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span id="userInitial" class="text-white font-semibold text-lg">U</span>
+                    </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nom</label>
-                        <p id="modalRoomName" class="text-gray-900 dark:text-white font-medium"></p>
+                        <div id="userName" class="text-white font-medium">Utilisateur</div>
+                        <div class="text-gray-400 text-sm">En ligne</div>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <button id="roomInfoButton" class="w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Infos salle</span>
+                        </div>
+                    </button>
+                    <button id="logoutButton" class="w-full text-left px-3 py-2 text-red-400 hover:text-red-300 hover:bg-gray-700 rounded-lg transition-colors">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Déconnexion</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal YouTube -->
+        <div id="youtubeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+            <div class="absolute inset-0 flex items-center justify-center p-4">
+                <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-white">Partager une vidéo YouTube</h3>
+                        <button id="closeYouTubeModal" class="text-gray-400 hover:text-white p-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                        <p id="modalRoomDescription" class="text-gray-600 dark:text-gray-400"></p>
+                    <form id="youtubeForm" class="space-y-4">
+                        <div>
+                            <label for="youtubeUrl" class="block text-sm font-medium text-gray-300 mb-2">URL YouTube</label>
+                            <input type="url" id="youtubeUrl" 
+                                   class="w-full px-4 py-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white"
+                                   placeholder="https://www.youtube.com/watch?v=..."
+                                   required>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button type="button" id="cancelYouTube" 
+                                    class="flex-1 px-4 py-3 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 transition-colors">
+                                Annuler
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors">
+                                Partager
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Upload Image -->
+        <div id="imageUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+            <div class="absolute inset-0 flex items-center justify-center p-4">
+                <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-white">Partager une image</h3>
+                        <button id="closeImageModal" class="text-gray-400 hover:text-white p-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Catégorie</label>
-                        <p id="modalRoomCategory" class="text-gray-600 dark:text-gray-400"></p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Utilisateurs</label>
-                        <p id="modalRoomUsers" class="text-gray-600 dark:text-gray-400"></p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Créée par</label>
-                        <p id="modalRoomCreator" class="text-gray-600 dark:text-gray-400"></p>
+                    <div class="space-y-4">
+                        <div class="border-2 border-dashed border-gray-600 rounded-xl p-6 text-center">
+                            <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p class="text-gray-400 mb-2">Glissez une image ici ou cliquez pour sélectionner</p>
+                            <p class="text-xs text-gray-500">PNG, JPG jusqu'à 5MB</p>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button type="button" id="cancelImage" 
+                                    class="flex-1 px-4 py-3 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-700 transition-colors">
+                                Annuler
+                            </button>
+                            <button type="button" id="selectImage" 
+                                    class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors">
+                                Sélectionner
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
-    <!-- Notifications toast -->
-    <div id="notifications" class="fixed top-4 right-4 z-50 space-y-2"></div>
-
+    <!-- Scripts -->
     <script src="/js/chat.js"></script>
 </body>
 </html>

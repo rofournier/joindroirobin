@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JoindreRobin - Connexion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .auth-container {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen auth-container flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <!-- Logo et titre -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">JoindreRobin</h1>
+            <p class="text-white/80">Connectez-vous pour rejoindre le chat</p>
+        </div>
+
+        <!-- Container d'authentification -->
+        <div class="glass-effect rounded-2xl p-8 shadow-2xl">
+            <!-- Onglets -->
+            <div class="flex mb-6 bg-white/10 rounded-lg p-1">
+                <button id="loginTab" class="flex-1 py-2 px-4 rounded-md text-white font-medium transition-all" onclick="showLogin()">
+                    Connexion
+                </button>
+                <button id="registerTab" class="flex-1 py-2 px-4 rounded-md text-white/60 font-medium transition-all" onclick="showRegister()">
+                    Inscription
+                </button>
+            </div>
+
+            <!-- Formulaire de connexion -->
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Nom d'utilisateur</label>
+                    <input type="text" id="loginUsername" required 
+                           class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+                           placeholder="Votre nom d'utilisateur">
+                </div>
+                
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Mot de passe</label>
+                    <input type="password" id="loginPassword" required 
+                           class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+                           placeholder="Votre mot de passe">
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-white text-purple-600 py-3 px-4 rounded-lg font-medium hover:bg-white/90 transition-all">
+                    Se connecter
+                </button>
+            </form>
+
+            <!-- Formulaire d'inscription -->
+            <form id="registerForm" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Nom d'utilisateur</label>
+                    <input type="text" id="registerUsername" required 
+                           class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+                           placeholder="Choisissez un nom d'utilisateur">
+                </div>
+
+                
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Mot de passe</label>
+                    <input type="password" id="registerPassword" required 
+                           class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-none focus:ring-white/50 transition-all"
+                           placeholder="Choisissez un mot de passe">
+                </div>
+                
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Confirmer le mot de passe</label>
+                    <input type="password" id="registerPasswordConfirm" required 
+                           class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+                           placeholder="Confirmez votre mot de passe">
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-white text-purple-600 py-3 px-4 rounded-lg font-medium hover:bg-white/90 transition-all">
+                    S'inscrire
+                </button>
+            </form>
+
+            <!-- Messages d'erreur/succès -->
+            <div id="message" class="mt-4 p-3 rounded-lg hidden"></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8">
+            <p class="text-white/60 text-sm">
+                En continuant, vous acceptez nos conditions d'utilisation
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let currentForm = 'login';
+
+        function showLogin() {
+            currentForm = 'login';
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginTab').classList.remove('text-white/60');
+            document.getElementById('loginTab').classList.add('text-white');
+            document.getElementById('registerTab').classList.remove('text-white');
+            document.getElementById('registerTab').classList.add('text-white/60');
+        }
+
+        function showRegister() {
+            currentForm = 'register';
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            document.getElementById('registerTab').classList.remove('text-white/60');
+            document.getElementById('registerTab').classList.add('text-white');
+            document.getElementById('loginTab').classList.remove('text-white');
+            document.getElementById('loginTab').classList.add('text-white/60');
+        }
+
+        function showMessage(message, type = 'error') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `mt-4 p-3 rounded-lg ${type === 'error' ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green-500/20 text-green-200 border border-green-500/30'}`;
+            messageDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                messageDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Gestion de la connexion
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Connexion réussie ! Redirection...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/lobby';
+                    }, 1000);
+                } else {
+                    showMessage(result.error || 'Erreur de connexion', 'error');
+                }
+            } catch (error) {
+                showMessage('Erreur de connexion au serveur', 'error');
+            }
+        });
+
+        // Gestion de l'inscription
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+            
+            if (password !== passwordConfirm) {
+                showMessage('Les mots de passe ne correspondent pas', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Inscription réussie ! Connexion automatique...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/lobby';
+                    }, 1000);
+                } else {
+                    showMessage(result.error || 'Erreur d\'inscription', 'error');
+                }
+            } catch (error) {
+                showMessage('Erreur d\'inscription au serveur', 'error');
+            }
+        });
+
+        // Vérifier si l'utilisateur est déjà connecté
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/auth/me');
+                const result = await response.json();
+                
+                if (result.authenticated) {
+                    window.location.href = '/lobby';
+                }
+            } catch (error) {
+                // Ignorer l'erreur, l'utilisateur n'est pas connecté
+            }
+        }
+
+        // Vérifier le statut d'authentification au chargement
+        checkAuthStatus();
+    </script>
+</body>
+</html>

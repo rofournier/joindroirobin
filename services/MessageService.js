@@ -4,7 +4,7 @@ class MessageService {
   /**
    * Envoyer un message dans une salle
    */
-  async sendMessage(username, roomId, content, messageType = 'text') {
+  async sendMessage(username, roomId, content, messageType = 'text', fileInfo = null) {
     try {
       // Vérifier que l'utilisateur est dans la salle
       const user = await User.findOne({ where: { username } });
@@ -17,13 +17,23 @@ class MessageService {
         throw new Error('Salle non trouvée');
       }
 
-      // Créer le message
-      const message = await Message.create({
+      // Préparer les données du message
+      const messageData = {
         content,
         message_type: messageType,
         user_id: user.id,
         room_id: roomId
-      });
+      };
+
+      // Ajouter les informations de fichier si c'est une image
+      if (fileInfo && messageType === 'image') {
+        messageData.file_url = fileInfo.url;
+        messageData.file_name = fileInfo.filename;
+        messageData.file_size = fileInfo.size;
+      }
+
+      // Créer le message
+      const message = await Message.create(messageData);
 
       // Récupérer le message avec les informations utilisateur
       const messageWithUser = await Message.findByPk(message.id, {

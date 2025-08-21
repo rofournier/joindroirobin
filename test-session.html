@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sessions - JoindreRobin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .log { background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Sessions - JoindreRobin</h1>
+        
+        <div class="section info">
+            <h3>📋 Test du système de sessions</h3>
+            <p>Cette page teste le système de sessions d'accès aux salles protégées.</p>
+        </div>
+        
+        <div class="section">
+            <h3>🔐 Test de validation de mot de passe</h3>
+            <input type="text" id="usernameInput" placeholder="Nom d'utilisateur" value="testuser">
+            <input type="text" id="roomIdInput" placeholder="ID de la salle" value="2">
+            <input type="password" id="passwordInput" placeholder="Mot de passe de la salle" value="xK9mP2qR">
+            <button class="btn-primary" onclick="testPasswordValidation()">Tester validation</button>
+            <div id="validationResult"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🔍 Vérification du sessionStorage</h3>
+            <button class="btn-secondary" onclick="checkSessionStorage()">Vérifier sessionStorage</button>
+            <button class="btn-success" onclick="clearSessionStorage()">Nettoyer sessionStorage</button>
+            <div id="storageResult"></div>
+        </div>
+        
+        <div class="section success">
+            <h3>✅ Résultat attendu</h3>
+            <p>1. Validation du mot de passe → Session créée</p>
+            <p>2. Token stocké en sessionStorage</p>
+            <p>3. Connexion Socket.IO avec le token</p>
+            <p>4. Token supprimé après utilisation</p>
+        </div>
+    </div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        async function testPasswordValidation() {
+            const username = document.getElementById('usernameInput').value;
+            const roomId = document.getElementById('roomIdInput').value;
+            const password = document.getElementById('passwordInput').value;
+            const resultDiv = document.getElementById('validationResult');
+            
+            if (!username || !roomId || !password) {
+                resultDiv.innerHTML = '<p style="color: red;">❌ Tous les champs sont requis</p>';
+                return;
+            }
+            
+            log(`🔐 Test de validation pour la salle ${roomId} avec l'utilisateur ${username}`, 'info');
+            
+            try {
+                const response = await fetch(`/api/rooms/${roomId}/validate-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    log(`✅ Validation réussie: ${result.message}`, 'success');
+                    log(`🔑 Token de session créé: ${result.sessionToken}`, 'success');
+                    
+                    resultDiv.innerHTML = `
+                        <p style="color: green;">✅ Validation réussie!</p>
+                        <p><strong>Message:</strong> ${result.message}</p>
+                        <p><strong>Token:</strong> ${result.sessionToken}</p>
+                        <p><strong>SessionStorage:</strong> ${sessionStorage.getItem('roomSessionToken') ? 'Token stocké' : 'Aucun token'}</p>
+                    `;
+                } else {
+                    log(`❌ Validation échouée: ${result.reason}`, 'error');
+                    resultDiv.innerHTML = `<p style="color: red;">❌ Échec: ${result.reason}</p>`;
+                }
+            } catch (error) {
+                log(`❌ Erreur lors de la validation: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<p style="color: red;">❌ Erreur: ${error.message}</p>`;
+            }
+        }
+        
+        function checkSessionStorage() {
+            const resultDiv = document.getElementById('storageResult');
+            const token = sessionStorage.getItem('roomSessionToken');
+            
+            if (token) {
+                resultDiv.innerHTML = `
+                    <p style="color: green;">✅ Token trouvé en sessionStorage</p>
+                    <p><strong>Token:</strong> ${token}</p>
+                `;
+                log(`🔍 Token trouvé en sessionStorage: ${token}`, 'success');
+            } else {
+                resultDiv.innerHTML = '<p style="color: orange;">⚠️ Aucun token en sessionStorage</p>';
+                log('🔍 Aucun token en sessionStorage', 'warning');
+            }
+        }
+        
+        function clearSessionStorage() {
+            sessionStorage.removeItem('roomSessionToken');
+            const resultDiv = document.getElementById('storageResult');
+            resultDiv.innerHTML = '<p style="color: blue;">🧹 SessionStorage nettoyé</p>';
+            log('🧹 SessionStorage nettoyé', 'info');
+        }
+        
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Test des sessions initialisé', 'success');
+            log('💡 Remplissez les champs et cliquez sur "Tester validation"', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -72,7 +72,7 @@ module.exports = {
         },
         {
           name: 'Les pingouins',
-          description: 'Bqanquise',
+          description: 'Banquise',
           password_hash: await bcrypt.hash('aB3cGT5', 10),
           is_protected: true,
           category: 'fun',
